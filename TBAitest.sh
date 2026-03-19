@@ -1,7 +1,9 @@
 #!/bin/bash
+shopt -s nocasematch
 
 player_hp=100
 ai_hp=100
+
 fight_choice = null
 
 fight_menu(){
@@ -11,9 +13,15 @@ read -p "which way of fighting do you choose?
 	case $fight_choice in
 	1)
 		read -p "Are you sure you want to use sword?" sword_choice
-			if [[ $sword_choice == yes* ]]
+			if [[ $sword_choice == "yes" ]]; then
+			echo "Swung sword"
+			fi
 		;;
-
+	2)
+		read -p "Are you sure you want to uppercut?" uppercut_choice
+			if [[ $uppercut_choice == "yes" ]]; then
+			echo "Threw uppercut"
+		;;
 
 	esac
 }
