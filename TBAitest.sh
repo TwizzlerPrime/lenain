@@ -4,7 +4,7 @@ shopt -s nocasematch
 player_hp=100
 ai_hp=100
 
-fight_choice = null
+
 
 fight_menu(){
 read -p "which way of fighting do you choose?
