@@ -3,7 +3,10 @@ shopt -s nocasematch
 
 player_hp=100
 player_energy=100
+
 ai_hp=100
+
+
 turn_taken=false
 defending=false
 
@@ -37,6 +40,7 @@ defend_menu() {
 			echo "You base in and prepare to defend the next hit."
 			shielding=true
 			turn_taken=true
+		fi
 }
 
 energy_menu(){
@@ -48,7 +52,10 @@ energy_menu(){
 	2. Battle Heal - Recover 50% of the damage you take as
 	health. 
 
-	3.Sharpness - Double sword damage for a turn" nrg
+	3.Sharpness - Double sword damage for a turn
+	
+
+	Type back to return" nrg
 
 	case $nrg in
 	1)
@@ -56,11 +63,23 @@ energy_menu(){
 		" thorns
 			if [[ $thorns == "yes" ]]; then
 				echo "Enchanted"
+			else
+				echo "exiting"
+			fi
 
 		;;
 	2)
+		read -p "Battle Heal costs 30 energy. Are you sure you want to enchant?
+		" bheal
+			if [[ $bheal == "yes" ]]; then
+				echo "Enchanted"
+			fi
 		;;
-	3)
+	3)	read -p "Sharpness costs 40 energy. Are you sure you want to enchant?
+		" sharpness
+			if [[ $sharpness == "yes" ]]; then
+				echo "Enchanted"
+			fi
 		;;
 
 	esac
@@ -92,16 +111,18 @@ while ((player_hp > 0 && ai_hp > 0)); do
 	esac
 done
 }
-
+	
 echo "Today, you will fight an AI with a pre-determined loadout."
 sleep 2
-read -p "You ready?" combat
+read -p "You ready (yes/no)?" combat
 if [[ $combat == "yes" || "y" ]]; then
 	echo "Let us begin."
 	sleep 2
 	AI_encounter
 
-else
+elif [[ $combat == "no" || "n" ]]; then
+	echo "Let us begin."
+	sleep 2
 	echo -e "Please retry."
 	exit 0
 fi
