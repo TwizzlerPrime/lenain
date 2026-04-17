@@ -164,6 +164,7 @@ ai_buff() {
  		
  	esac
 
+
  	echo "Player HP: $player_hp | AI HP: $ai_hp"
  	sleep 2
  	
