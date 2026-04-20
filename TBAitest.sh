@@ -5,9 +5,13 @@ shopt -s nocasematch
 player_hp=100
 player_defense=0
 player_energy=100
+
+player_effects=()
+
 damage_buff=0
 turn_taken=false
 defending=false
+
 
 #AI Variables
 AI_hp=100
@@ -15,10 +19,29 @@ AI_damage_buff=0
 AI_turn_taken=false
 AI_defense=0
 
+#Effect functions
+apply_effect() {
+	local effect=$1
+	local duration=$2
+
+	player_effects+=("$effect:$duration")
+}
+
+
+on_player_hit() {
+	local damage_taken=$1
+
+	
+}
+
+
 player_status(){
 	echo "Player HP: $player_hp | Player energy: $player_energy"
 	sleep 1
 	echo "Player defense: $player_defense | Current damage buff: $damage_buff %"
+
+	echo -e "Current status effects: \n 
+	"
 	
 }
 
@@ -81,13 +104,14 @@ defend_menu() {
 }
 
 energy_menu(){
+	local duration=0
 	read -p "There are a majority of things you can do with energy.
 	Choose between:
 	1. Thorns Enchant - Reflect 25% of the damage you take 
-	back to their attacker.
+	back to their attacker for 1 turn.
 
 	2. Battle Heal - Recover 50% of the damage you take as
-	health. 
+	health for 2 turns. 
 
 	3.Sharpness - Double sword damage for a turn. You take a bonus turn immediately after.
 	
@@ -101,6 +125,7 @@ energy_menu(){
 			if [[ $thorns == "yes" && $player_energy -ge 20 ]]; then
 				player_energy=$((player_energy-=20))
 				echo "Enchanted"
+				player_effects+=("Thorns:1")
 				turn_taken=true
 				
 			else
@@ -115,6 +140,7 @@ energy_menu(){
 			if [[ $bheal == "yes" && $player_energy -ge 30  ]]; then
 				player_energy=$((player_energy - 30))
 				echo "Enchanted"
+				player_effects+=("Lifesteal:2")
 				turn_taken=true
 				
 			fi
@@ -125,6 +151,7 @@ energy_menu(){
 				player_energy=$((player_energy - 40))
 				damage_buff=$((damage_buff + 10))
 				echo "Enchanted"
+				apply_effect "Thorns" 3
 				turn_taken=false
 				sleep 2
 			fi
