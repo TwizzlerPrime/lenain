@@ -28,9 +28,51 @@ apply_effect() {
 }
 
 
+update_effects() {
+	local new_effects=()
+
+	for effect in "${player_effects[@]}"; do
+		name="${effect%%:*}"
+		turns="${effect##*:}"
+
+		((turns--))
+
+		if ((turns > 0)); then
+			new_effects+=("$name:$turns")
+		else
+			echo "$name has worn off."
+		fi
+	done
+
+	player_effects=("${new_effects[@]}")
+
+}
+
+has_effect() {
+	local target=$1
+	for effect in "${player_effects[@]}"; do
+		[[ $${effect%%:*} == "$target" ]] && return 0
+	done
+	return 1
+}
+
+calculate_damage() {
+	local base=$1
+	local active_dmg_buff=$2
+	local defender_defense=$3
+
+	local damage=$((base * (100 + attacker_buff) / 100))
+	damage=$((damage * (100 - defender_defense) / 100))
+}
+
+# This works for when there is a reactive enchantment
 on_player_hit() {
 	local damage_taken=$1
-
+	if has_effect "Thorns"; then
+		local reflect$((damage_taken * 25 / 100))
+		echo "Reflect $reflect damage with thorns."
+		AI_hp=$((AI_hp - reflect))
+	fi
 	
 }
 
@@ -40,9 +82,14 @@ player_status(){
 	sleep 1
 	echo "Player defense: $player_defense | Current damage buff: $damage_buff %"
 
-	echo -e "Current status effects: \n 
-	"
-	
+	echo -e "Current status effects:"
+	if ((${#player_effects[@]} == 0)); then
+		continue
+	else
+		for effect in "${player_effects[@]}"; do
+			echo " - $effect"
+		done
+	fi
 }
 
 AI_status(){
