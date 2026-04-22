@@ -7,6 +7,7 @@ player_defense=0
 player_energy=100
 
 player_effects=()
+AI_effects=()
 
 damage_buff=0
 turn_taken=false
@@ -51,7 +52,7 @@ update_effects() {
 has_effect() {
 	local target=$1
 	for effect in "${player_effects[@]}"; do
-		[[ $${effect%%:*} == "$target" ]] && return 0
+		[[ ${effect%%:*} == "$target" ]] && return 0
 	done
 	return 1
 }
@@ -60,9 +61,11 @@ calculate_damage() {
 	local base=$1
 	local active_dmg_buff=$2
 	local defender_defense=$3
-
-	local damage=$((base * (100 + attacker_buff) / 100))
+ 
+	local damage=$((base * (100 + active_dmg_buff) / 100))
 	damage=$((damage * (100 - defender_defense) / 100))
+
+	echo $damage
 }
 
 # This works for when there is a reactive enchantment
@@ -84,7 +87,7 @@ player_status(){
 
 	echo -e "Current status effects:"
 	if ((${#player_effects[@]} == 0)); then
-		continue
+		echo "None"
 	else
 		for effect in "${player_effects[@]}"; do
 			echo " - $effect"
@@ -105,29 +108,30 @@ read -p "which way of fighting do you choose?
 2. Uppercut" fight_choice
 	case $fight_choice in
 	1)
-		local sword_damage=$((20 + damage_buff))
+		local sword_damage=$(calculate_damage 20 "$damage_buff" "$AI_defense")
 		local critical=$((RANDOM % 100))
 		
 		read -p "Are you sure you want to use sword?" sword_choice
 			if [[ $sword_choice == "yes" ]]; then
-			echo "Swung sword"
-			sleep 1	
+				echo "Swung sword"
+				sleep 1	
 				
 				if ((critical < 10)); then
-				echo "Critical hit! You get a bonus turn."
-				sword_damage=$((sword_damage * 2))
-				AI_hp=$((AI_hp - sword_damage))
-				turn_taken=false
+					echo "Critical hit! You get a bonus turn."
+					sword_damage=$((sword_damage *= 2))
+					AI_hp=$((AI_hp - sword_damage))
+					turn_taken=false
 				
 				else
-				AI_hp=$((AI_hp - sword_damage))
-				turn_taken=true
-				
+					AI_hp=$((AI_hp - sword_damage))
+					turn_taken=true
+					echo "You deal $sword_damage damage!"
+					sleep 2
 				fi
 			fi
 		;;
 	2)
-		local uppercut_damage=$((15 + damage_buff))
+		local uppercut_damage=$(calculate_damage 15 damage_buff AI_defense)
 		read -p "Are you sure you want to uppercut?" uppercut_choice
 			if [[ $uppercut_choice == "yes" ]]; then
 			echo "Threw uppercut"
@@ -172,7 +176,7 @@ energy_menu(){
 			if [[ $thorns == "yes" && $player_energy -ge 20 ]]; then
 				player_energy=$((player_energy-=20))
 				echo "Enchanted"
-				player_effects+=("Thorns:1")
+				apply_effect "Thorns" 1
 				turn_taken=true
 				
 			else
@@ -187,7 +191,7 @@ energy_menu(){
 			if [[ $bheal == "yes" && $player_energy -ge 30  ]]; then
 				player_energy=$((player_energy - 30))
 				echo "Enchanted"
-				player_effects+=("Lifesteal:2")
+				apply_effect "Lifesteal" 2
 				turn_taken=true
 				
 			fi
@@ -198,7 +202,7 @@ energy_menu(){
 				player_energy=$((player_energy - 40))
 				damage_buff=$((damage_buff + 10))
 				echo "Enchanted"
-				apply_effect "Thorns" 3
+				apply_effect "Sharpness" 1
 				turn_taken=false
 				sleep 2
 			fi
@@ -215,6 +219,12 @@ AI_cero() {
 	echo "The AI charges a Cero! You are damaged by a laser."
 	player_hp=$((player_hp - cero_damage))
 	AI_turn_taken=true
+
+	if (((RANDOM % 10 + 1) < 10)); then
+		echo "The player is burning."
+		apply_effect "Burning" 2
+	fi
+
 	player_status
 	AI_status
 
@@ -366,6 +376,7 @@ while ((player_hp > 0 && AI_hp > 0)); do
 	done
 	AI_turn
 	AI_turn_taken=false
+	update_effects
 done
 }
 	
