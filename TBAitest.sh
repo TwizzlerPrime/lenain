@@ -108,7 +108,7 @@ read -p "which way of fighting do you choose?
 2. Uppercut" fight_choice
 	case $fight_choice in
 	1)
-		local sword_damage=$(calculate_damage 20 "$damage_buff" "$AI_defense")
+		local sword_damage=$(calculate_damage 20 $damage_buff $AI_defense)
 		local critical=$((RANDOM % 100))
 		
 		read -p "Are you sure you want to use sword?" sword_choice
@@ -131,7 +131,7 @@ read -p "which way of fighting do you choose?
 			fi
 		;;
 	2)
-		local uppercut_damage=$(calculate_damage 15 damage_buff AI_defense)
+		local uppercut_damage=$(calculate_damage 15 $damage_buff $AI_defense)
 		read -p "Are you sure you want to uppercut?" uppercut_choice
 			if [[ $uppercut_choice == "yes" ]]; then
 			echo "Threw uppercut"
@@ -374,6 +374,7 @@ while ((player_hp > 0 && AI_hp > 0)); do
 
 		esac
 	done
+	update_effects
 	AI_turn
 	AI_turn_taken=false
 	update_effects
