@@ -10,7 +10,7 @@ player_effects=()
 AI_effects=()
 
 damage_buff=0
-turn_taken=false
+bonus_turn=false
 defending=false
 
 
@@ -35,15 +35,20 @@ update_effects() {
 	local new_effects=()
 
 	for effect in "${player_effects[@]}"; do
-		name="${effect%%:*}"
-		temp="${effect#*:}"
-		type="${temp%%:*}"
-		turns="${effect##*:}"
+		name="${effect%%:*}" #Takes just the name in the entire effect list
+		
+		temp="${effect#*:}" #Removes the name so that the remaining parameters are type:turns:value
+		type="${temp%%:*}" #Accesses the new temp to get just the type
+		
+		temp2="${temp#*:}" #Removes the type (everything at the start to the first colon) to keep turns:value
+		turns="${temp2%%:*}" #Accesses temp2 and removes the end to the first colon to hold turns
+
+		value="${temp2##*:}" #Cuts out the turns to get only the value
 
 		((turns--))
 
 		if ((turns > 0)); then
-			new_effects+=("$name:$turns")
+			new_effects+=("$name:$type:$turns:$value")
 
 
 		else
@@ -56,9 +61,10 @@ update_effects() {
 }
 
 has_effect() {
-	local target=$1
+	local active_effect=$1
+	#For each effect the player has, take only the effect name and store it as a variable/
 	for effect in "${player_effects[@]}"; do
-		[[ ${effect%%:*} == "$target" ]] && return 0
+		[[ ${effect%%:*} == "$active_effect" ]] && return 0
 	done
 	return 1
 }
@@ -96,7 +102,15 @@ player_status(){
 		echo "None"
 	else
 		for effect in "${player_effects[@]}"; do
-			echo " - $effect"
+			effect_name="${effect%%:*}" #Crops out just effect name from full effect list
+
+			cut1="${effect#*:}"
+			cut2="${cut1#*:}" # After 2 cuts, we now have just duration:value
+
+			effect_turns="${cut2%%:*}" #
+
+
+			echo " - $effect_name ($effect_turns turns left)"
 		done
 	fi
 }
@@ -107,6 +121,14 @@ AI_status(){
 	echo "Current damage buff: $AI_damage_buff %"
 	
 }
+
+end_turn() {
+	update_effects
+
+
+
+}
+
 
 fight_menu(){
 read -p "which way of fighting do you choose?
@@ -124,13 +146,16 @@ read -p "which way of fighting do you choose?
 				
 				if ((critical < 10)); then
 					echo "Critical hit! You get a bonus turn."
+					
 					sword_damage=$((sword_damage *= 2))
 					AI_hp=$((AI_hp - sword_damage))
-					turn_taken=false
+
+					echo "You deal $sword_damage damage!"
+					bonus_turn=true
 				
 				else
+					bonus_turn=false
 					AI_hp=$((AI_hp - sword_damage))
-					turn_taken=true
 					echo "You deal $sword_damage damage!"
 					sleep 2
 				fi
@@ -143,7 +168,7 @@ read -p "which way of fighting do you choose?
 			echo "Threw uppercut"
 
 			AI_hp=$((AI_hp - uppercut_damage))
-			turn_taken=true
+			
 			fi
 
 		;;
@@ -156,7 +181,7 @@ defend_menu() {
 		if [[ $defend == "yes" ]]; then
 			echo "You base in and prepare to defend the next hit."
 			shielding=true
-			turn_taken=true
+			
 		fi
 }
 
@@ -181,7 +206,7 @@ energy_menu(){
 		" thorns
 
 			if has_effect "Thorns"; then
-				echo "a little too sharp ay??"
+				echo "Too many thorns don't you think?"
 				sleep 1
 				return 0
 			fi
@@ -189,8 +214,8 @@ energy_menu(){
 			if [[ $thorns == "yes" && $player_energy -ge 20 ]]; then
 				player_energy=$((player_energy-=20))
 				echo "Enchanted"
-				apply_effect "Thorns" 1
-				turn_taken=true
+				apply_effect "Thorns" "misc" 2 10
+				
 				update_effects
 				
 			else
@@ -213,7 +238,7 @@ energy_menu(){
 				player_energy=$((player_energy - 30))
 				echo "Enchanted"
 				apply_effect "Lifesteal" "healthbuff" 2 15
-				turn_taken=true
+				bonus_turn=true
 				
 				
 			fi
@@ -231,7 +256,7 @@ energy_menu(){
 				damage_buff=$((damage_buff + 10))
 				echo "Enchanted"
 				apply_effect "Sharpness" "damagebuff" 1 10
-				turn_taken=false
+				bonus_turn=false
 				sleep 2
 				
 			fi
@@ -253,8 +278,6 @@ AI_cero() {
 		echo "The player is burning."
 		apply_effect "Burning" 2
 	fi
-
-	player_status
 	AI_status
 
 }
@@ -291,7 +314,6 @@ AI_buffs() {
 				;;
 	esac
 	AI_status
-	player_status
 }		
 
  AI_turn() {
@@ -303,9 +325,11 @@ AI_buffs() {
 
  	case $AI_choice in
  		1)
- 			AI_cero ;;
+ 			AI_cero 
+ 			;;
  		2) 
- 			AI_buffs ;;
+ 			AI_buffs 
+ 			;;
  		
  	esac
 
@@ -320,14 +344,14 @@ AI_buffs() {
 AI_encounter(){
 while ((player_hp > 0 && AI_hp > 0)); do
 	
-	turn_taken=false
+	bonus_turn=false
 
-	while [[ $turn_taken == false ]]; do
+	while [[ $bonus_turn == false ]]; do
 		read -p "Action to take 
 		1. Fight
 		2. Defend
 		3. Energy moves
-		4. Display current buffs
+		4. Display current effects
 		" choice
 	
 		case $choice in
@@ -342,14 +366,7 @@ while ((player_hp > 0 && AI_hp > 0)); do
 				;;
 		
 			4)	
-				echo -e "Current status effects:"
-				if ((${#player_effects[@]} == 0)); then
-					echo "None"
-				else
-					for effect in "${player_effects[@]}"; do
-						echo " - $effect"
-					done
-				fi
+				player_status
 				;;
 			*)
 				echo -e "Do I need to translate to Bahasa Indonesia for you???"
@@ -357,8 +374,35 @@ while ((player_hp > 0 && AI_hp > 0)); do
 
 
 		esac
-		
+
+			if [[ $bonus_turn == true ]]; then
+				echo "Bonus turn!"
+				continue
+			fi
+
 	done
+		if ((AI_hp <= 0)); then
+			read -p "You beat the training system. Retry? (y/n)" retry
+			
+			while true; do
+				if [[ $retry == "y" ]]; then
+					echo "cool"
+					sleep 1
+					clear
+					./TBAitest.sh
+					exit 0
+
+				elif [[ $retry == "n" ]]; then
+					echo "begone"
+					exit 0
+
+				else
+					echo "figure it out"
+				fi
+			done
+		fi
+
+	
 	AI_turn
 	AI_turn_taken=false
 	update_effects
