@@ -10,7 +10,7 @@ player_effects=()
 AI_effects=()
 
 damage_buff=0
-player_actions_left=0
+bonus_turn=false
 
 defending=false
 
@@ -123,6 +123,20 @@ AI_status(){
 	
 }
 
+start_of_turn() {
+	 for effect in "${player_effects[@]}"; do
+        name="${effect%%:*}"
+
+        temp="${effect#*:}"
+        type="${temp%%:*}"
+
+        temp2="${temp#*:}"
+        turns="${temp2%%:*}"
+
+        value="${temp2##*:}"
+
+}
+
 end_turn() {
 	update_effects
 }
@@ -151,8 +165,8 @@ read -p "which way of fighting do you choose?
 					echo "You deal $sword_damage damage!"
 					sleep 2
 
-					((player_actions_left--))
-					((player_actions_left++))
+					bonus_turn=true
+
 					
 					
 				
@@ -160,7 +174,7 @@ read -p "which way of fighting do you choose?
 					
 					AI_hp=$((AI_hp - sword_damage))
 					echo "You deal $sword_damage damage!"
-					((player_actions_left--))
+					
 					sleep 2
 				fi
 			fi
@@ -173,7 +187,7 @@ read -p "which way of fighting do you choose?
 			echo "Threw uppercut"
 
 			AI_hp=$((AI_hp - uppercut_damage))
-			((player_actions_left--))
+			
 
 
 			fi
@@ -223,7 +237,7 @@ energy_menu(){
 				echo "Enchanted"
 				apply_effect "Thorns" "misc" 2 10
 				
-				((player_actions_left--))
+				
 
 				
 			else
@@ -247,7 +261,7 @@ energy_menu(){
 				echo "Enchanted"
 				apply_effect "Lifesteal" "healthbuff" 2 15
 
-				((player_actions_left--))
+				
 
 				
 				end_turn
@@ -264,13 +278,15 @@ energy_menu(){
 			fi
 
 			if [[ $sharpness == "yes" && $player_energy -ge 40 ]]; then
+				
 				player_energy=$((player_energy - 40))
 				damage_buff=$((damage_buff + 10))
+				
 				echo "Enchanted"
 				apply_effect "Sharpness" "damagebuff" 1 10
 				
-				((player_actions_left--))
-				((player_actions_left++))
+				bonus_turn=true
+
 
 				sleep 2
 				
@@ -374,11 +390,16 @@ AI_buffs() {
  
  }
 
-AI_encounter(){
-while ((player_hp > 0 && AI_hp > 0)); do
-	player_actions_left=1
+player_menus() {
+	
+}
 
-	while (( $player_actions_left >= 1 )); do
+player_turn() {
+	start_of_turn
+
+	bonus_turn=false
+
+	while true; do
 		read -p "Action to take 
 		1. Fight
 		2. Defend
@@ -389,12 +410,15 @@ while ((player_hp > 0 && AI_hp > 0)); do
 		case $choice in
 			1)
 		  		fight_menu
+		  		break
 		  		;;
 			2)
 				defend_menu
+				break
 				;;
 			3)
 				energy_menu
+				break
 				;;
 		
 			4)	
@@ -408,6 +432,22 @@ while ((player_hp > 0 && AI_hp > 0)); do
 		esac
 
 	done
+	end_turn
+
+	if [[ $bonus_turn == true ]]; then
+		echo "Bonus turn!"
+		sleep 1
+		player_turn
+	fi
+}
+
+AI_encounter(){
+while ((player_hp > 0 && AI_hp > 0)); do
+	bonus_turn=false
+
+
+		player_turn
+
 		if ((AI_hp <= 0)); then
 			while true; do
 			read -p "You beat the training system. Retry? (y/n)" retry
@@ -433,7 +473,6 @@ while ((player_hp > 0 && AI_hp > 0)); do
 
 	
 	AI_turn
-	AI_actions_left=1
 	
 done
 }
