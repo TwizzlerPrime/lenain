@@ -10,6 +10,7 @@ player_effects=()
 AI_effects=()
 
 damage_buff=0
+current_actors=""
 bonus_turn=false
 
 defending=false
@@ -33,9 +34,21 @@ apply_effect() {
 
 
 update_effects() {
+	local actor_effects=$1
 	local new_effects=()
 
-	for effect in "${player_effects[@]}"; do
+
+	local effects_array=()
+
+	if [[ $actor == "player" ]]; then
+    	effects_array=("${player_effects[@]}")
+	else
+    	effects_array=("${AI_effects[@]}")
+	fi
+
+
+
+	for effect in "${effects_array[@]}"; do
 		name="${effect%%:*}" #Takes just the name in the entire effect list
 		
 		temp="${effect#*:}" #Removes the name so that the remaining parameters are type:turns:value
@@ -57,16 +70,27 @@ update_effects() {
 		fi
 	done
 
-	player_effects=("${new_effects[@]}")
+	actor_effects=("${new_effects[@]}")
 
 }
 
 has_effect() {
 	local active_effect=$1
+	local actor=$2
+	local effects_array=()
+
+	if [[ $actor == "player" ]]; then
+		effects_array=("${player_effects[@]}")
+	
+	else
+		effects_array=("${AI_effects[@]}")
+	fi
+
 	#For each effect the player has, take only the effect name and store it as a variable/
-	for effect in "${player_effects[@]}"; do
+	for effect in "${effects_array[@]}"; do
 		[[ ${effect%%:*} == "$active_effect" ]] && return 0
 	done
+	
 	return 1
 }
 
@@ -84,7 +108,7 @@ calculate_damage() {
 # This works for when there is a reactive enchantment
 on_player_hit() {
 	local damage_taken=$1
-	if has_effect "Thorns"; then
+	if has_effect "Thorns" player_effects; then
 		local reflect=$((damage_taken * 25 / 100))
 		echo "Reflect $reflect damage with thorns."
 		AI_hp=$((AI_hp - reflect))
@@ -120,11 +144,38 @@ AI_status(){
 	echo "AI HP: $AI_hp | AI defense: $AI_defense"
 	sleep 1
 	echo "Current damage buff: $AI_damage_buff %"
+
+	echo -e "Current status effects:"
+	if ((${#ai_effects[@]} == 0)); then
+		echo "None"
+	else
+		for effect in "${ai_effects[@]}"; do
+			ai_effect_name="${effect%%:*}" #Crops out just effect name from full effect list
+
+			cut1="${effect#*:}"
+			cut2="${cut1#*:}" # After 2 cuts, we now have just duration:value
+
+			effect_turns="${cut2%%:*}" #
+
+
+			echo " - $effect_name ($effect_turns turns left)"
+		done
+	fi
 	
 }
 
 start_of_turn() {
-	 for effect in "${player_effects[@]}"; do
+	local actor=$1
+
+	local effects_array=()
+
+	if [[ $actor == "player" ]]; then
+    	effects_array=("${player_effects[@]}")
+	else
+    	effects_array=("${AI_effects[@]}")
+	fi
+
+	 for effect in "${effects_array[@]}"; do
         name="${effect%%:*}"
 
         temp="${effect#*:}"
@@ -135,10 +186,23 @@ start_of_turn() {
 
         value="${temp2##*:}"
 
+    	if has_effect "Burning" "$actor"; then
+    		echo "$actor is burning."
+    	fi
+    done
+
 }
 
 end_turn() {
-	update_effects
+	local actor=$1
+	
+	if [[ $actor == "player" ]]; then
+
+		update_effects 
+
+	else
+		update_effects 
+	fi
 }
 
 
@@ -365,11 +429,10 @@ AI_buffs() {
  AI_turn() {
  	clear
  	
- 	AI_actions_left=1
 
- 	while (( $AI_actions_left >= 1 )); do
  	echo -e "----The AI is taking a turn ----"
  	sleep 2
+ 	
  	AI_choice=$((RANDOM % 2 + 1))
 
  	case $AI_choice in
@@ -383,22 +446,10 @@ AI_buffs() {
  	esac
 
 
- 	
- 	sleep 2
- 	
- 	done
- 
  }
 
-player_menus() {
-	
-}
-
-player_turn() {
-	start_of_turn
-
-	bonus_turn=false
-
+player_menu() {
+	echo -e "$turns"
 	while true; do
 		read -p "Action to take 
 		1. Fight
@@ -406,7 +457,8 @@ player_turn() {
 		3. Energy moves
 		4. Display current effects
 		" choice
-	
+	#debug line
+		echo -e "$turns"
 		case $choice in
 			1)
 		  		fight_menu
@@ -427,54 +479,67 @@ player_turn() {
 			*)
 				echo -e "Do I need to translate to Bahasa Indonesia for you???"
 				;;
+			esac
+		done
 
+}
 
-		esac
+take_turn() {
+    local actor=$1
 
-	done
-	end_turn
+    bonus_turn=false
 
-	if [[ $bonus_turn == true ]]; then
-		echo "Bonus turn!"
-		sleep 1
-		player_turn
-	fi
+    start_of_turn "$actor"
+
+    if [[ $actor == "player" ]]; then
+        player_menu
+    else
+        AI_turn
+    fi
+
+    end_turn "$actor"
+
+    if [[ $bonus_turn == true ]]; then
+        echo "$actor gets a bonus turn!"
+        sleep 1
+        take_turn "$actor"
+    fi
 }
 
 AI_encounter(){
-while ((player_hp > 0 && AI_hp > 0)); do
-	bonus_turn=false
+	while ((player_hp > 0 && AI_hp > 0)); do
 
 
-		player_turn
-
+		take_turn "player"
+		
 		if ((AI_hp <= 0)); then
 			while true; do
-			read -p "You beat the training system. Retry? (y/n)" retry
+				read -p "You beat the training system. Retry? (y/n)" retry
 			
 			
 				if [[ $retry == "y" ]]; then
-					echo "cool"
-					sleep 1
-					clear
-					./TBAitest.sh
-					exit 0
+						echo "cool"
+						sleep 1
+						clear
+						./TBAitest.sh
+						exit 0
 
 				elif [[ $retry == "n" ]]; then
-					echo "begone"
-					exit 0
+						echo "begone"
+						exit 0
 
 				else
-					echo "figure it out"
+						echo "figure it out"
 
 				fi
 			done
 		fi
 
 	
-	AI_turn
+		take_turn "AI"
+
 	
-done
+	done
 }
 	
 echo "Today, you will fight an AI with a pre-determined loadout."
