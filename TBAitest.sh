@@ -28,8 +28,9 @@ apply_effect() {
 	local type=$2
 	local duration=$3
 	local value=$4
+	local state
 
-	player_effects+=("$effect:$type:$duration:$value")
+	player_effects+=("$effect:$type:$duration:$value:$state")
 }
 
 
@@ -49,20 +50,12 @@ update_effects() {
 
 
 	for effect in "${effects_array[@]}"; do
-		name="${effect%%:*}" #Takes just the name in the entire effect list
+		IFS=":" read -r name type turns value state <<< "$effect"
 		
-		temp="${effect#*:}" #Removes the name so that the remaining parameters are type:turns:value
-		type="${temp%%:*}" #Accesses the new temp to get just the type
-		
-		temp2="${temp#*:}" #Removes the type (everything at the start to the first colon) to keep turns:value
-		turns="${temp2%%:*}" #Accesses temp2 and removes the end to the first colon to hold turns
-
-		value="${temp2##*:}" #Cuts out the turns to get only the value
-
 		((turns--))
 
 		if ((turns > 0)); then
-			new_effects+=("$name:$type:$turns:$value")
+			new_effects+=("$name:$type:$turns:$value:$state")
 
 
 		else
@@ -70,7 +63,12 @@ update_effects() {
 		fi
 	done
 
-	actor_effects=("${new_effects[@]}")
+	if [[ $actor == "player" ]]; then
+		player_effects=("${new_effects[@]}")
+	
+	else
+		AI_effects=("${new_effects[@]}")
+	fi
 
 }
 
@@ -88,6 +86,7 @@ has_effect() {
 
 	#For each effect the player has, take only the effect name and store it as a variable/
 	for effect in "${effects_array[@]}"; do
+		IFS=":" read -r effect_name type effect_turns value state <<< "$effect"
 		[[ ${effect%%:*} == "$active_effect" ]] && return 0
 	done
 	
@@ -127,12 +126,7 @@ player_status(){
 		echo "None"
 	else
 		for effect in "${player_effects[@]}"; do
-			effect_name="${effect%%:*}" #Crops out just effect name from full effect list
-
-			cut1="${effect#*:}"
-			cut2="${cut1#*:}" # After 2 cuts, we now have just duration:value
-
-			effect_turns="${cut2%%:*}" #
+			IFS=":" read -r effect_name type effect_turns value <<< "$effect"
 
 
 			echo " - $effect_name ($effect_turns turns left)"
@@ -146,17 +140,11 @@ AI_status(){
 	echo "Current damage buff: $AI_damage_buff %"
 
 	echo -e "Current status effects:"
-	if ((${#ai_effects[@]} == 0)); then
+	if ((${#AI_effects[@]} == 0)); then
 		echo "None"
 	else
-		for effect in "${ai_effects[@]}"; do
-			ai_effect_name="${effect%%:*}" #Crops out just effect name from full effect list
-
-			cut1="${effect#*:}"
-			cut2="${cut1#*:}" # After 2 cuts, we now have just duration:value
-
-			effect_turns="${cut2%%:*}" #
-
+		for effect in "${AI_effects[@]}"; do
+			IFS=":" read -r effect_name effect_turns _ <<< "$effect"
 
 			echo " - $effect_name ($effect_turns turns left)"
 		done
@@ -176,15 +164,7 @@ start_of_turn() {
 	fi
 
 	 for effect in "${effects_array[@]}"; do
-        name="${effect%%:*}"
-
-        temp="${effect#*:}"
-        type="${temp%%:*}"
-
-        temp2="${temp#*:}"
-        turns="${temp2%%:*}"
-
-        value="${temp2##*:}"
+        IFS=":" read -r name _ <<< "$effect"
 
     	if has_effect "Burning" "$actor"; then
     		echo "$actor is burning."
@@ -242,7 +222,6 @@ read -p "which way of fighting do you choose?
 					sleep 2
 				fi
 			fi
-			end_turn
 		;;
 	2)
 		local uppercut_damage=$(calculate_damage 15 $damage_buff $AI_defense)
@@ -255,7 +234,7 @@ read -p "which way of fighting do you choose?
 
 
 			fi
-			end_turn
+			
 		;;
 
 	esac
@@ -266,7 +245,6 @@ defend_menu() {
 		if [[ $defend == "yes" ]]; then
 			echo "You base in and prepare to defend the next hit."
 			shielding=true
-			end_turn
 		fi
 }
 
@@ -328,7 +306,7 @@ energy_menu(){
 				
 
 				
-				end_turn
+				
 				
 			fi
 						
@@ -384,7 +362,7 @@ AI_cero() {
 	AI_status
 	
 	((AI_actions_left--))
-	end_turn
+	
 }
 
 AI_buffs() {
@@ -422,7 +400,6 @@ AI_buffs() {
 
 
 		esac
-		end_turn
 	AI_status
 }		
 
