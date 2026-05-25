@@ -28,7 +28,7 @@ apply_effect() {
 	local type=$2
 	local duration=$3
 	local value=$4
-	local state
+	local state=$5
 
 	player_effects+=("$effect:$type:$duration:$value:$state")
 }
@@ -87,7 +87,8 @@ has_effect() {
 	#For each effect the player has, take only the effect name and store it as a variable/
 	for effect in "${effects_array[@]}"; do
 		IFS=":" read -r effect_name type effect_turns value state <<< "$effect"
-		[[ ${effect%%:*} == "$active_effect" ]] && return 0
+		
+		"$effect" == "$active_effect" && return 0
 	done
 	
 	return 1
@@ -101,8 +102,7 @@ calculate_damage() {
 	local damage=$((base * (100 + active_dmg_buff) / 100))
 	damage=$((damage * (100 - defender_defense) / 100))
 
-	echo $damage
-}
+	echo $damage #store end value
 
 # This works for when there is a reactive enchantment
 on_player_hit() {
@@ -122,11 +122,12 @@ player_status(){
 	echo "Player defense: $player_defense | Current damage buff: $damage_buff %"
 
 	echo -e "Current status effects:"
+	
 	if ((${#player_effects[@]} == 0)); then
 		echo "None"
 	else
 		for effect in "${player_effects[@]}"; do
-			IFS=":" read -r effect_name type effect_turns value <<< "$effect"
+			IFS=":" read -r effect_name type effect_turns value status <<< "$effect"
 
 
 			echo " - $effect_name ($effect_turns turns left)"
@@ -144,7 +145,7 @@ AI_status(){
 		echo "None"
 	else
 		for effect in "${AI_effects[@]}"; do
-			IFS=":" read -r effect_name effect_turns _ <<< "$effect"
+			IFS=":" read -r effect_name type effect_turns _ <<< "$effect"
 
 			echo " - $effect_name ($effect_turns turns left)"
 		done
@@ -156,18 +157,23 @@ start_of_turn() {
 	local actor=$1
 
 	local effects_array=()
+	local actor_hp
 
 	if [[ $actor == "player" ]]; then
     	effects_array=("${player_effects[@]}")
+    	$actor_hp == $player_hp
+
 	else
     	effects_array=("${AI_effects[@]}")
+    	$actor_hp == $AI_hp
 	fi
 
 	 for effect in "${effects_array[@]}"; do
-        IFS=":" read -r name _ <<< "$effect"
+        IFS=":" read -r effect_name type effect_turns _ <<< "$effect"
 
     	if has_effect "Burning" "$actor"; then
     		echo "$actor is burning."
+
     	fi
     done
 
