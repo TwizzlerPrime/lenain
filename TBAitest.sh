@@ -24,18 +24,28 @@ AI_defense=0
 
 #Effect functions
 apply_effect() {
-	local effect=$1
-	local type=$2
-	local duration=$3
-	local value=$4
-	local state=$5
 
-	player_effects+=("$effect:$type:$duration:$value:$state")
+	local target=$1
+	local effect=$2
+	local type=$3
+	local duration=$4
+	local value=$5
+	local state=$6
+	
+	local effects_array=()
+
+	if [[ $target == "player" ]]; then
+    	player_effects+=("$effect:$type:$duration:$value:$state")
+	else
+    	AI_effects+=("$effect:$type:$duration:$value:$state")
+	fi
+
+	
 }
 
 
 update_effects() {
-	local actor_effects=$1
+	local actor=$1
 	local new_effects=()
 
 
@@ -52,7 +62,9 @@ update_effects() {
 	for effect in "${effects_array[@]}"; do
 		IFS=":" read -r name type turns value state <<< "$effect"
 		
+		if [[ $state == "active" ]]; then
 		((turns--))
+		fi
 
 		if ((turns > 0)); then
 			new_effects+=("$name:$type:$turns:$value:$state")
@@ -69,6 +81,8 @@ update_effects() {
 	else
 		AI_effects=("${new_effects[@]}")
 	fi
+
+
 
 }
 
@@ -88,7 +102,7 @@ has_effect() {
 	for effect in "${effects_array[@]}"; do
 		IFS=":" read -r effect_name type effect_turns value state <<< "$effect"
 		
-		"$effect" == "$active_effect" && return 0
+		[[ "$effect_name" == "$active_effect" ]] && return 0
 	done
 	
 	return 1
@@ -103,11 +117,12 @@ calculate_damage() {
 	damage=$((damage * (100 - defender_defense) / 100))
 
 	echo $damage #store end value
+}
 
 # This works for when there is a reactive enchantment
 on_player_hit() {
 	local damage_taken=$1
-	if has_effect "Thorns" player_effects; then
+	if has_effect "Thorns" player; then
 		local reflect=$((damage_taken * 25 / 100))
 		echo "Reflect $reflect damage with thorns."
 		AI_hp=$((AI_hp - reflect))
@@ -160,21 +175,20 @@ start_of_turn() {
 	local actor_hp
 
 	if [[ $actor == "player" ]]; then
-    	effects_array=("${player_effects[@]}")
-    	$actor_hp == $player_hp
-
+		effects_array=("${player_effects[@]}")
 	else
     	effects_array=("${AI_effects[@]}")
-    	$actor_hp == $AI_hp
+     	actor_hp=AI_hp
 	fi
 
-	 for effect in "${effects_array[@]}"; do
-        IFS=":" read -r effect_name type effect_turns _ <<< "$effect"
+	 for i in "${!effects_array[@]}"; do
+        IFS=":" read -r effect_name type effect_turns value state <<< "${effects_array[i]}"
 
-    	if has_effect "Burning" "$actor"; then
-    		echo "$actor is burning."
+    	if [[ $state == "inactive" ]]; then
+    		player_effects[i]="$effect_name:$type:$effect_turns:$value:active"
 
     	fi
+    	
     done
 
 }
@@ -184,10 +198,11 @@ end_turn() {
 	
 	if [[ $actor == "player" ]]; then
 
-		update_effects 
+		update_effects player
+
 
 	else
-		update_effects 
+		update_effects AI
 	fi
 }
 
@@ -274,7 +289,7 @@ energy_menu(){
 		read -p "Thorns costs 20 energy. Are you sure you want to enchant?
 		" thorns
 
-			if has_effect "Thorns"; then
+			if has_effect "Thorns" player; then
 				echo "Too many thorns don't you think?"
 				sleep 1
 				return 0
@@ -283,7 +298,7 @@ energy_menu(){
 			if [[ $thorns == "yes" && $player_energy -ge 20 ]]; then
 				player_energy=$((player_energy-=20))
 				echo "Enchanted"
-				apply_effect "Thorns" "misc" 2 10
+				apply_effect player "Thorns" "misc" 2 10 inactive
 				
 				
 
@@ -298,7 +313,7 @@ energy_menu(){
 		read -p "Battle Heal costs 30 energy. Are you sure you want to enchant?
 		" bheal
 
-			if has_effect "Lifesteal"; then
+			if has_effect "Lifesteal" player; then
 				echo "too much vampire in your system"
 				sleep 1
 				return 0 
@@ -307,19 +322,14 @@ energy_menu(){
 			if [[ $bheal == "yes" && $player_energy -ge 30  ]]; then
 				player_energy=$((player_energy - 30))
 				echo "Enchanted"
-				apply_effect "Lifesteal" "healthbuff" 2 15
-
-				
-
-				
-				
-				
+				apply_effect player "Lifesteal" "healthbuff" 2 15 inactive
+	
 			fi
 						
 		;;
 	3)	read -p "Sharpness costs 40 energy. Are you sure you want to enchant?
 		" sharpness
-			if has_effect "Sharpness"; then
+			if has_effect "Sharpness" player; then
 				echo "a little too sharp ay??"
 				sleep 1
 				return 0
@@ -331,7 +341,7 @@ energy_menu(){
 				damage_buff=$((damage_buff + 10))
 				
 				echo "Enchanted"
-				apply_effect "Sharpness" "damagebuff" 1 10
+				apply_effect player "Sharpness" "damagebuff" 1 10 "inactive"
 				
 				bonus_turn=true
 
@@ -362,7 +372,7 @@ AI_cero() {
 
 	if (((RANDOM % 10 + 1) < 10)); then
 		echo "The player is burning."
-		apply_effect "Burning" "DOT_debuff" 2 10
+		apply_effect player "Burning" "DOT_debuff" 2 10 "inactive"
 	fi
 	
 	AI_status
