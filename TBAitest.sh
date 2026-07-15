@@ -33,14 +33,30 @@ apply_effect() {
 	local state=$6
 	
 	local effects_array=()
-
-	if [[ $target == "player" ]]; then
-    	player_effects+=("$effect:$type:$duration:$value:$state")
-	else
-    	AI_effects+=("$effect:$type:$duration:$value:$state")
-	fi
-
 	
+	if [[ $target == "player" ]]; then
+		for i in "${!player_effects[@]}"; do
+        	IFS=":" read -r name type turns value state <<< "${player_effects[i]}"
+
+        	if [[ $name == "$effect" ]]; then
+            	player_effects[i]="$name:$type:$duration:$value:$state"
+            	return
+        	fi
+    	done
+
+    player_effects+=("$effect:$type:$duration:$value:$state")
+
+	else
+		for i in "${!AI_effects[@]}"; do
+			IFS=":'" read -r name type turns value state <<< "${AI_effects[i]}"
+			
+			if [[ $name == "$effect" ]]; then
+            	AI_effects[i]="$name:$type:$duration:$value:$state"
+            	return
+        	fi
+    	done
+    AI_effects+=("$effect:$type:$duration:$value:$state")
+	fi
 }
 
 
@@ -189,6 +205,24 @@ start_of_turn() {
 
     	fi
     	
+    	if [[ $state == "active" ]]; then
+    		case $effect_name in
+
+    			Burning)
+    				echo "$actor take $value burn damage"
+    				if [[ $actor == "player" ]]; then
+    					player_hp=$((player_hp - value ))
+    				else
+    				AI_hp=$((AI_hp - value))
+    				
+    			fi
+    			;;
+
+
+    		esac
+    	fi
+
+
     done
 
 }
@@ -339,6 +373,9 @@ energy_menu(){
 				
 				player_energy=$((player_energy - 40))
 				damage_buff=$((damage_buff + 10))
+
+
+
 				
 				echo "Enchanted"
 				apply_effect player "Sharpness" "damagebuff" 1 10 "inactive"
@@ -435,6 +472,10 @@ AI_buffs() {
  		2) 
  			AI_buffs 
  			;;
+ 		
+
+
+
  		
  	esac
 
