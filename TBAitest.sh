@@ -34,6 +34,8 @@ apply_effect() {
 	
 	local effects_array=()
 	
+	# Loop over each index in the player_effects array. If the new effect already exists in the array, reset its duration instead of adding a new one (hence the return)
+	#Otherwise, just ignore it and add as usual. 
 	if [[ $target == "player" ]]; then
 		for i in "${!player_effects[@]}"; do
         	IFS=":" read -r name type turns value state <<< "${player_effects[i]}"
@@ -47,6 +49,8 @@ apply_effect() {
     player_effects+=("$effect:$type:$duration:$value:$state")
 
 	else
+		# Loop over each index in the AI_effects array. If the new effect already exists in the array, reset its duration instead of adding a new one (hence the return)
+	#Otherwise, just ignore it and add as usual. 
 		for i in "${!AI_effects[@]}"; do
 			IFS=":'" read -r name type turns value state <<< "${AI_effects[i]}"
 			
@@ -200,8 +204,14 @@ start_of_turn() {
 	 for i in "${!effects_array[@]}"; do
         IFS=":" read -r effect_name type effect_turns value state <<< "${effects_array[i]}"
 
+
+
+        echo "DEBUG: effect='$effect_name' type='$type' turns='$effect_turns' value='$value' state='$state'" 
+
     	if [[ $state == "inactive" ]]; then
     		player_effects[i]="$effect_name:$type:$effect_turns:$value:active"
+
+    		state="active"
 
     	fi
     	
@@ -209,7 +219,7 @@ start_of_turn() {
     		case $effect_name in
 
     			Burning)
-    				echo "$actor take $value burn damage"
+    				echo "$actor takes $value burn damage!"
     				if [[ $actor == "player" ]]; then
     					player_hp=$((player_hp - value ))
     				else
