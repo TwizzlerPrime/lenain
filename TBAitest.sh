@@ -68,7 +68,6 @@ update_effects() {
 	local actor=$1
 	local new_effects=()
 
-
 	local effects_array=()
 
 	if [[ $actor == "player" ]]; then
@@ -128,6 +127,34 @@ has_effect() {
 	return 1
 }
 
+#A function used to dynamically calculate how much defense a target has so that we don't have to worry about adding and subtracting defense.
+dynamic_defense() {
+	local target=$1
+	local defense
+	local effects=()
+
+	if [[ $target == "player" ]]; then
+		defense=$player_defense
+		effects=("${player_effects[@]}")
+	else
+		defense=$AI_defense
+		effects=("${AI_effects[@]}")
+	fi
+	for effect in "${effects[@]}"; do
+		IFS=":" read -r effect_name type effect_turns value state <<< "$effect"
+		
+    
+
+    	sleep 3
+		if [[ $state == "active" && $type == "defensedown" ]]; then
+			defense=$((defense - value))
+		fi
+	done
+
+	echo "$defense"
+}
+
+
 calculate_damage() {
 	local base=$1
 	local active_dmg_buff=$2
@@ -171,7 +198,9 @@ player_status(){
 }
 
 AI_status(){
-	echo "AI HP: $AI_hp | AI defense: $AI_defense"
+	local current_defense=$(dynamic_defense "AI")
+	
+	echo "AI HP: $AI_hp | AI defense: $current_defense"
 	sleep 1
 	echo "Current damage buff: $AI_damage_buff %"
 
@@ -206,7 +235,9 @@ start_of_turn() {
 
 
 
-        echo "DEBUG: effect='$effect_name' type='$type' turns='$effect_turns' value='$value' state='$state'" 
+        # echo "DEBUG: effect='$effect_name' type='$type' turns='$effect_turns' value='$value' state='$state'" 
+        declare -p AI_effects
+				sleep 2
 
     	if [[ $state == "inactive" ]]; then
     		player_effects[i]="$effect_name:$type:$effect_turns:$value:active"
@@ -223,9 +254,10 @@ start_of_turn() {
     				if [[ $actor == "player" ]]; then
     					player_hp=$((player_hp - value ))
     				else
-    				AI_hp=$((AI_hp - value))
-    				
-    			fi
+    					AI_hp=$((AI_hp - value))
+    				sleep 2
+    				fi
+    			
     			;;
 
 
@@ -257,10 +289,12 @@ read -p "which way of fighting do you choose?
 2. Uppercut" fight_choice
 	case $fight_choice in
 	1)
-		local sword_damage=$(calculate_damage 20 $damage_buff $AI_defense)
+		local calculated_defense=$(dynamic_defense "AI")
+		local sword_damage=$(calculate_damage 20 $damage_buff $calculated_defense)
 		local critical=$((RANDOM % 100))
 		
-		read -p "Are you sure you want to use sword?" sword_choice
+		read -p "Are you sure you want to use sword? A critical hit will x2 your damage and give
+		you a bonus turn." sword_choice
 			if [[ $sword_choice == "yes" ]]; then
 				echo "Swung sword"
 				sleep 1	
@@ -285,23 +319,42 @@ read -p "which way of fighting do you choose?
 					echo "You deal $sword_damage damage!"
 					
 					sleep 2
+
 				fi
+				return 0
+			else
+				return 1
 			fi
 		;;
 	2)
-		local uppercut_damage=$(calculate_damage 15 $damage_buff $AI_defense)
-		read -p "Are you sure you want to uppercut?" uppercut_choice
-			if [[ $uppercut_choice == "yes" ]]; then
-			echo "Threw uppercut"
+		local calculated_defense=$(dynamic_defense "AI")
+		echo "Calculated defense: $calculated_defense"
+		local uppercut_damage=$(calculate_damage 15 $damage_buff "$calculated_defense")
 
-			AI_hp=$((AI_hp - uppercut_damage))
-			
+		
+		read -p "Are you sure you want to uppercut? This move reduces the defense of the target. 
+		This move cannot crit." uppercut_choice
+			if [[ $uppercut_choice == "yes" ]]; then
+				echo "Threw uppercut"
+				apply_effect "AI" "Vulnerable" "defensedown" 2 15 "active"
+				
+				AI_hp=$((AI_hp - uppercut_damage))
+				echo "You deal $uppercut_damage damage!"
+				sleep 2
+
+
+				return 0
+			else
+				return 1
 
 
 			fi
 			
 		;;
 
+	*)
+		echo "What are you talking about"
+		return 1
 	esac
 }
 
@@ -505,16 +558,19 @@ player_menu() {
 		echo -e "$turns"
 		case $choice in
 			1)
-		  		fight_menu
+		  		if fight_menu; then
 		  		break
+		  	fi
 		  		;;
 			2)
-				defend_menu
+				if defend_menu; then
 				break
+			fi
 				;;
 			3)
-				energy_menu
+				if energy_menu; then
 				break
+			fi
 				;;
 		
 			4)	
@@ -537,6 +593,7 @@ take_turn() {
 
     if [[ $actor == "player" ]]; then
         player_menu
+
     else
         AI_turn
     fi
