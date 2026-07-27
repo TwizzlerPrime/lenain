@@ -2,7 +2,7 @@
 shopt -s nocasematch
 
 #Variables 
-player_hp=100
+player_hp=1000
 player_defense=0
 player_energy=100
 
@@ -148,6 +148,10 @@ dynamic_defense() {
     	sleep 3
 		if [[ $state == "active" && $type == "defensedown" ]]; then
 			defense=$((defense - value))
+		
+		elif [[ $state == "active" && $type == "defenseup" ]]; then
+			defense=$((defense + value))
+		
 		fi
 	done
 
@@ -477,12 +481,11 @@ AI_cero() {
 	
 	AI_status
 	
-	((AI_actions_left--))
 	
 }
 
 AI_buffs() {
-	local buff=$((RANDOM % 2 + 1))
+	local buff=$((RANDOM % 3 + 1))
 	case $buff in 
 
 		1)  
@@ -495,6 +498,9 @@ AI_buffs() {
 					AI_damage_buff=$((AI_damage_buff = 30))
 				fi 
 			else
+
+
+
 				AI_cero
 			fi
 
@@ -504,20 +510,48 @@ AI_buffs() {
 			if (( AI_hp < 100 )); then
 				echo "The AI heals 20 health!"
 				AI_hp=$((AI_hp + 20))
-				((AI_actions_left--))
+				
 				
 				if (( AI_hp > 100 )); then
 					AI_hp=$((AI_hp = 100))
 				fi
 			else
-				AI_cero
+				AI_knee_strike
 			fi
 				;;
 
+		3)
+			local added_defense=$(dynamic_defense "AI")
+			if (( added_defense < 20 )); then
+				echo "The AI gains more defense!"
+
+				apply_effect "AI" "Stalwart" "defenseup" 2 10 "inactive"
+
+				if ((added_defense > 20)); then
+					added_defense=$((added_defense = 20))
+				fi
+			else
+				AI_knee_strike
+			fi
+			;;
 
 		esac
 	AI_status
 }		
+
+AI_knee_strike() {
+	local target_defense=$(dynamic_defense "player")
+	local knee_damage=$(calculate_damage 15 AI_damage_buff $target_defense)
+	
+	echo "The AI throws out a knee strike!"
+
+	player_hp=$((player_hp - $knee_damage))
+
+	AI_status
+
+
+}
+
 
  AI_turn() {
  	clear
@@ -526,7 +560,7 @@ AI_buffs() {
  	echo -e "----The AI is taking a turn ----"
  	sleep 2
  	
- 	AI_choice=$((RANDOM % 2 + 1))
+ 	AI_choice=$((RANDOM % 3 + 1))
 
  	case $AI_choice in
  		1)
@@ -534,6 +568,9 @@ AI_buffs() {
  			;;
  		2) 
  			AI_buffs 
+ 			;;
+
+ 		3) AI_knee_strike
  			;;
  		
 
