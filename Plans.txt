@@ -1,0 +1,14 @@
+This will detail the development plans for the next commit.
+
+2026-07-26
+I have noticed that I have not developed the skills i need to code things on
+the fly, which suck for challenges i set for myself (mostly because
+I use AI a bit and then convince myself I know what happened). To practice this, I want
+to:
+- Code 2 new moves for the AI
+- Debug the inevitable bugs
+- Make some polishes to the code
+WITH 0 AI AT ALL
+
+The plan is to finish this before the end of next week.
+
