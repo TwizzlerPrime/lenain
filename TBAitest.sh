@@ -2,7 +2,7 @@
 shopt -s nocasematch
 
 #Variables 
-player_hp=1000
+player_hp=100
 player_defense=0
 player_energy=100
 
