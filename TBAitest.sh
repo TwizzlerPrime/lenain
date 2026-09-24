@@ -240,8 +240,7 @@ start_of_turn() {
 
 
         # echo "DEBUG: effect='$effect_name' type='$type' turns='$effect_turns' value='$value' state='$state'" 
-        declare -p AI_effects
-				sleep 2
+  
 
     	if [[ $state == "inactive" ]]; then
     		player_effects[i]="$effect_name:$type:$effect_turns:$value:active"
@@ -393,13 +392,15 @@ energy_menu(){
 			if has_effect "Thorns" player; then
 				echo "Too many thorns don't you think?"
 				sleep 1
-				return 0
+				return 1
 			fi
 
 			if [[ $thorns == "yes" && $player_energy -ge 20 ]]; then
 				player_energy=$((player_energy-=20))
 				echo "Enchanted"
 				apply_effect player "Thorns" "misc" 2 10 inactive
+
+				return 0
 				
 				
 
@@ -417,13 +418,15 @@ energy_menu(){
 			if has_effect "Lifesteal" player; then
 				echo "too much vampire in your system"
 				sleep 1
-				return 0 
+				return 1 
 			fi
 
 			if [[ $bheal == "yes" && $player_energy -ge 30  ]]; then
 				player_energy=$((player_energy - 30))
 				echo "Enchanted"
 				apply_effect player "Lifesteal" "healthbuff" 2 15 inactive
+
+				return 0
 	
 			fi
 						
@@ -433,16 +436,13 @@ energy_menu(){
 			if has_effect "Sharpness" player; then
 				echo "a little too sharp ay??"
 				sleep 1
-				return 0
+				return 1
 			fi
 
 			if [[ $sharpness == "yes" && $player_energy -ge 40 ]]; then
 				
 				player_energy=$((player_energy - 40))
 				damage_buff=$((damage_buff + 10))
-
-
-
 				
 				echo "Enchanted"
 				apply_effect player "Sharpness" "damagebuff" 1 10 "inactive"
@@ -459,6 +459,7 @@ energy_menu(){
 		;;
 
 	*)  echo "returning to main screen"
+		return 1
 			
 			;;
 
