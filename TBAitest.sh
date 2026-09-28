@@ -1,6 +1,9 @@
 #!/bin/bash
 shopt -s nocasematch
 
+#General variables
+move_cooldown=""
+
 #Variables 
 player_hp=100
 player_defense=0
@@ -176,6 +179,8 @@ on_player_hit() {
 	if has_effect "Thorns" player; then
 		local reflect=$((damage_taken * 25 / 100))
 		echo "Reflect $reflect damage with thorns."
+		
+		apply_effect "AI" "Bleed" "DOT_debuff" 2 10 "active"
 		AI_hp=$((AI_hp - reflect))
 	fi
 	
@@ -238,8 +243,7 @@ start_of_turn() {
         IFS=":" read -r effect_name type effect_turns value state <<< "${effects_array[i]}"
 
 
-
-        # echo "DEBUG: effect='$effect_name' type='$type' turns='$effect_turns' value='$value' state='$state'" 
+        echo "DEBUG: effect='$effect_name' type='$type' turns='$effect_turns' value='$value' state='$state'" 
   
 
     	if [[ $state == "inactive" ]]; then
@@ -250,16 +254,16 @@ start_of_turn() {
     	fi
     	
     	if [[ $state == "active" ]]; then
-    		case $effect_name in
+    		case $type in
 
-    			Burning)
-    				echo "$actor takes $value burn damage!"
-    				if [[ $actor == "player" ]]; then
-    					player_hp=$((player_hp - value ))
-    				else
-    					AI_hp=$((AI_hp - value))
-    				sleep 2
-    				fi
+    			DOT_debuff) 
+					echo "$actor takes $value damage from $effect_name!"
+	    			if [[ $actor == "player" ]]; then
+	    				player_hp=$((player_hp - value ))
+	    			else
+	    				AI_hp=$((AI_hp - value))
+	    			fi
+	    				sleep 2
     			
     			;;
 
@@ -283,6 +287,8 @@ end_turn() {
 	else
 		update_effects AI
 	fi
+
+	clear
 }
 
 
@@ -364,8 +370,9 @@ read -p "which way of fighting do you choose?
 defend_menu() {
 	read -p "Are you sure?" defend
 		if [[ $defend == "yes" ]]; then
-			echo "You base in and prepare to defend the next hit."
-			shielding=true
+			echo "Doesn't work at the moment."
+			return 1
+			
 		fi
 }
 
@@ -472,7 +479,7 @@ AI_cero() {
 	echo "The AI charges a Cero! You are damaged by a laser."
 	
 	player_hp=$((player_hp - cero_damage))
-	
+	on_player_hit cero_damage
 	
 
 	if (((RANDOM % 10 + 1) < 10)); then
@@ -547,6 +554,7 @@ AI_knee_strike() {
 	echo "The AI throws out a knee strike!"
 
 	player_hp=$((player_hp - $knee_damage))
+	on_player_hit knee_damage
 
 	AI_status
 
@@ -555,9 +563,8 @@ AI_knee_strike() {
 
 
  AI_turn() {
- 	clear
  	
-
+ 	echo "actor = $actor"
  	echo -e "----The AI is taking a turn ----"
  	sleep 2
  	
