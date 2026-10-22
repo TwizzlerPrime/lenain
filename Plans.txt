@@ -12,3 +12,5 @@ WITH 0 AI AT ALL
 
 The plan is to finish this before the end of next week.
 
+Plan successful, but production was halted for a while due to other important things.
+

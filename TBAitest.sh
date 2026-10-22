@@ -8,10 +8,8 @@ move_cooldown=""
 player_hp=100
 player_defense=0
 player_energy=100
-
 player_effects=()
 AI_effects=()
-
 damage_buff=0
 current_actors=""
 bonus_turn=false
@@ -24,6 +22,25 @@ AI_hp=100
 AI_damage_buff=0
 AI_actions_left=0
 AI_defense=0
+
+
+load_npc() {
+	read -p "Who do you challenge?
+	1. Espada" npc_choice
+
+	case $npc_choice in
+		1)	
+			source ~/lenain/npcs/espada.sh
+			;;
+
+		*)	echo "Not available."
+			return 1
+			;;
+	esac
+
+	echo "Challenging the $NPC_NAME."
+
+}
 
 #Effect functions
 apply_effect() {
@@ -209,9 +226,11 @@ player_status(){
 AI_status(){
 	local current_defense=$(dynamic_defense "AI")
 	
+	
 	echo "AI HP: $AI_hp | AI defense: $current_defense"
 	sleep 1
 	echo "Current damage buff: $AI_damage_buff %"
+	read -p "Enter to continue"
 
 	echo -e "Current status effects:"
 	if ((${#AI_effects[@]} == 0)); then
@@ -288,7 +307,7 @@ end_turn() {
 		update_effects AI
 	fi
 
-	clear
+	
 }
 
 
@@ -632,6 +651,8 @@ player_menu() {
 take_turn() {
     local actor=$1
 
+    
+
     bonus_turn=false
 
     start_of_turn "$actor"
@@ -653,11 +674,18 @@ take_turn() {
 }
 
 AI_encounter(){
+	load_npc || return 1
+
 	while ((player_hp > 0 && AI_hp > 0)); do
 
 
 		take_turn "player"
 		
+		if (( AI_hp <= 0 )); then
+            echo "You defeated $NPC_NAME!"
+            return 0
+        fi
+
 		if ((AI_hp <= 0)); then
 			while true; do
 				read -p "You beat the training system. Retry? (y/n)" retry
