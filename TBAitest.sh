@@ -256,6 +256,7 @@ start_of_turn() {
 
 	if [[ $actor == "player" ]]; then
 		effects_array=("${player_effects[@]}")
+		actor_hp=player_hp
 	else
     	effects_array=("${AI_effects[@]}")
      	actor_hp=AI_hp
@@ -269,7 +270,7 @@ start_of_turn() {
   
 
     	if [[ $state == "inactive" ]]; then
-    		player_effects[i]="$effect_name:$type:$effect_turns:$value:active"
+    		effects_array[i]="$effect_name:$type:$effect_turns:$value:active"
 
     		state="active"
 
@@ -295,6 +296,15 @@ start_of_turn() {
 
 
     done
+
+    #Write changes back to global arrays
+    if [[ $actor == "player" ]]; then
+		player_effects=("${effects_array[@]}")
+		actor_hp=player_hp
+	else
+    	AI_effects=("${effects_array[@]}")
+     	actor_hp=AI_hp
+	fi
 
 }
 
@@ -441,6 +451,8 @@ energy_menu(){
 					
 				else
 					echo "Not enough energy or exited interface."
+					sleep 1
+					return 1
 					
 				fi
 				
@@ -461,7 +473,9 @@ energy_menu(){
 					apply_effect player "Lifesteal" "healthbuff" 2 15 inactive
 
 					return 0
-		
+				
+				else
+					return 1
 				fi
 							
 			;;
@@ -485,7 +499,9 @@ energy_menu(){
 
 
 					sleep 2
-					
+				
+				else
+					return 1	
 				fi
 				
 				
