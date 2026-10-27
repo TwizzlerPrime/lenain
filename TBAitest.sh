@@ -9,7 +9,7 @@ player_hp=100
 player_defense=0
 player_energy=100
 player_effects=()
-AI_effects=()
+
 damage_buff=0
 current_actors=""
 bonus_turn=false
@@ -26,11 +26,15 @@ AI_defense=0
 
 load_npc() {
 	read -p "Who do you challenge?
-	1. Espada" npc_choice
+	1. Espada
+	2. John" npc_choice
 
 	case $npc_choice in
 		1)	
 			source ~/lenain/npcs/espada.sh
+			;;
+
+		2) source ~/lenain/npcs/john.sh
 			;;
 
 		*)	echo "Not available."
@@ -38,7 +42,7 @@ load_npc() {
 			;;
 	esac
 
-	echo "Challenging the $NPC_NAME."
+	echo "Challenging $NPC_NAME."
 
 }
 
@@ -226,7 +230,6 @@ player_status(){
 AI_status(){
 	local current_defense=$(dynamic_defense "AI")
 	
-	
 	echo "AI HP: $AI_hp | AI defense: $current_defense"
 	sleep 1
 	echo "Current damage buff: $AI_damage_buff %"
@@ -396,218 +399,108 @@ defend_menu() {
 }
 
 energy_menu(){
-
-	read -p "There are a majority of things you can do with energy.
-	Choose between:
-	1. Thorns Enchant - Reflect 25% of the damage you take 
-	back to their attacker for 1 turn.
-
-	2. Battle Heal - Recover 50% of the damage you take as
-	health for 2 turns. 
-
-	3.Sharpness - Double sword damage for a turn. You take a bonus turn immediately after.
-	
-
-	Type back to return" nrg
-
-	case $nrg in
-	1)
-		read -p "Thorns costs 20 energy. Are you sure you want to enchant?
-		" thorns
-
-			if has_effect "Thorns" player; then
-				echo "Too many thorns don't you think?"
-				sleep 1
-				return 1
-			fi
-
-			if [[ $thorns == "yes" && $player_energy -ge 20 ]]; then
-				player_energy=$((player_energy-=20))
-				echo "Enchanted"
-				apply_effect player "Thorns" "misc" 2 10 inactive
-
-				return 0
-				
-				
-
-				
-			else
-				echo "Not enough energy or exited interface."
-				
-			fi
-			
-		;;
-	2)
-		read -p "Battle Heal costs 30 energy. Are you sure you want to enchant?
-		" bheal
-
-			if has_effect "Lifesteal" player; then
-				echo "too much vampire in your system"
-				sleep 1
-				return 1 
-			fi
-
-			if [[ $bheal == "yes" && $player_energy -ge 30  ]]; then
-				player_energy=$((player_energy - 30))
-				echo "Enchanted"
-				apply_effect player "Lifesteal" "healthbuff" 2 15 inactive
-
-				return 0
-	
-			fi
-						
-		;;
-	3)	read -p "Sharpness costs 40 energy. Are you sure you want to enchant?
-		" sharpness
-			if has_effect "Sharpness" player; then
-				echo "a little too sharp ay??"
-				sleep 1
-				return 1
-			fi
-
-			if [[ $sharpness == "yes" && $player_energy -ge 40 ]]; then
-				
-				player_energy=$((player_energy - 40))
-				damage_buff=$((damage_buff + 10))
-				
-				echo "Enchanted"
-				apply_effect player "Sharpness" "damagebuff" 1 10 "inactive"
-				
-				bonus_turn=true
-
-
-				sleep 2
-				
-			fi
-			
-			
-			
-		;;
-
-	*)  echo "returning to main screen"
+	if has_effect "Crippled" player; then
+		echo "Cannot use abilities. Check your status for when the debuff expires."
+		sleep 3
 		return 1
-			
+	else
+
+		read -p "There are a majority of things you can do with energy.
+		Choose between:
+		1. Thorns Enchant - Reflect 25% of the damage you take 
+		back to their attacker for 1 turn.
+
+		2. Battle Heal - Recover 50% of the damage you take as
+		health for 2 turns. 
+
+		3.Sharpness - Double sword damage for a turn. You take a bonus turn immediately after.
+		
+
+		Type back to return" nrg
+
+		case $nrg in
+		1)
+			read -p "Thorns costs 20 energy. Are you sure you want to enchant?
+			" thorns
+
+				if has_effect "Thorns" player; then
+					echo "Too many thorns don't you think?"
+					sleep 1
+					return 1
+				fi
+
+				if [[ $thorns == "yes" && $player_energy -ge 20 ]]; then
+					player_energy=$((player_energy-=20))
+					echo "Enchanted"
+					apply_effect "player" "Thorns" "misc" 2 10 inactive
+
+					return 0
+					
+					
+
+					
+				else
+					echo "Not enough energy or exited interface."
+					
+				fi
+				
+			;;
+		2)
+			read -p "Battle Heal costs 30 energy. Are you sure you want to enchant?
+			" bheal
+
+				if has_effect "Lifesteal" player; then
+					echo "too much vampire in your system"
+					sleep 1
+					return 1 
+				fi
+
+				if [[ $bheal == "yes" && $player_energy -ge 30  ]]; then
+					player_energy=$((player_energy - 30))
+					echo "Enchanted"
+					apply_effect player "Lifesteal" "healthbuff" 2 15 inactive
+
+					return 0
+		
+				fi
+							
+			;;
+		3)	read -p "Sharpness costs 40 energy. Are you sure you want to enchant?
+			" sharpness
+				if has_effect "Sharpness" player; then
+					echo "a little too sharp ay??"
+					sleep 1
+					return 1
+				fi
+
+				if [[ $sharpness == "yes" && $player_energy -ge 40 ]]; then
+					
+					player_energy=$((player_energy - 40))
+					damage_buff=$((damage_buff + 10))
+					
+					echo "Enchanted"
+					apply_effect player "Sharpness" "damagebuff" 1 10 "inactive"
+					
+					bonus_turn=true
+
+
+					sleep 2
+					
+				fi
+				
+				
+				
 			;;
 
-	esac
-}
-
-AI_cero() {
-	local cero_damage=$((20 + AI_damage_buff))
-	
-	echo "The AI charges a Cero! You are damaged by a laser."
-	
-	player_hp=$((player_hp - cero_damage))
-	on_player_hit cero_damage
-	
-
-	if (((RANDOM % 10 + 1) < 10)); then
-		echo "The player is burning."
-		apply_effect player "Burning" "DOT_debuff" 2 10 "inactive"
-	fi
-	
-	AI_status
-	
-	
-}
-
-AI_buffs() {
-	local buff=$((RANDOM % 3 + 1))
-	case $buff in 
-
-		1)  
-			if (( AI_damage_buff < 30 )); then
-				echo "The AI uses a damage buff!"
-				AI_damage_buff=$((AI_damage_buff + 10)) 
+		*)  echo "returning to main screen"
+			return 1
 				
-				
-				if (( AI_damage_buff > 30 )); then
-					AI_damage_buff=$((AI_damage_buff = 30))
-				fi 
-			else
-
-
-
-				AI_cero
-			fi
-
-			;; 
-
-		2) 
-			if (( AI_hp < 100 )); then
-				echo "The AI heals 20 health!"
-				AI_hp=$((AI_hp + 20))
-				
-				
-				if (( AI_hp > 100 )); then
-					AI_hp=$((AI_hp = 100))
-				fi
-			else
-				AI_knee_strike
-			fi
 				;;
 
-		3)
-			local added_defense=$(dynamic_defense "AI")
-			if (( added_defense < 20 )); then
-				echo "The AI gains more defense!"
-
-				apply_effect "AI" "Stalwart" "defenseup" 2 10 "inactive"
-
-				if ((added_defense > 20)); then
-					added_defense=$((added_defense = 20))
-				fi
-			else
-				AI_knee_strike
-			fi
-			;;
-
 		esac
-	AI_status
-}		
-
-AI_knee_strike() {
-	local target_defense=$(dynamic_defense "player")
-	local knee_damage=$(calculate_damage 15 AI_damage_buff $target_defense)
-	
-	echo "The AI throws out a knee strike!"
-
-	player_hp=$((player_hp - $knee_damage))
-	on_player_hit knee_damage
-
-	AI_status
-
-
+fi
 }
 
-
- AI_turn() {
- 	
- 	echo "actor = $actor"
- 	echo -e "----The AI is taking a turn ----"
- 	sleep 2
- 	
- 	AI_choice=$((RANDOM % 3 + 1))
-
- 	case $AI_choice in
- 		1)
- 			AI_cero 
- 			;;
- 		2) 
- 			AI_buffs 
- 			;;
-
- 		3) AI_knee_strike
- 			;;
- 		
-
-
-
- 		
- 	esac
-
-
- }
 
 player_menu() {
 	echo -e "$turns"
