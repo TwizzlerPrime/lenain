@@ -1,6 +1,6 @@
 This will detail the development plans for the next commit.
 
-2026-07-26
+26-07-2026
 I have noticed that I have not developed the skills i need to code things on
 the fly, which suck for challenges i set for myself (mostly because
 I use AI a bit and then convince myself I know what happened). To practice this, I want
@@ -14,3 +14,13 @@ The plan is to finish this before the end of next week.
 
 Plan successful, but production was halted for a while due to other important things.
 
+26-10-2026
+Some bugs to fix next:
+
+- Sharpness still has a chance to immediately wear off upon use
+- When asked are you sure for most options, pressing an invalid option skips turn instead of using return 1
+- Thorns just straight up harms the user
+- Battle heal does not work atm
+- The ai status does not display
+- There's for some reason no death message
+- If you are out of energy it skips your turn instead of return 1.
