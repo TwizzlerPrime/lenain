@@ -1,0 +1,4 @@
+Starting to code the ideas in my head lead to me discovering that bash is a 
+language that can be very convoluted when it comes to coding games (the logic
+is quite unsuitable for it).
+Here is a list of all the things I learned from this experiment:

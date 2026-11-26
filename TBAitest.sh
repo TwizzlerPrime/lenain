@@ -1,0 +1,649 @@
+#!/bin/bash
+shopt -s nocasematch
+
+#General variables
+move_cooldown=""
+
+#Variables 
+player_hp=100
+player_defense=0
+player_energy=100
+player_effects=()
+
+damage_buff=0
+current_actors=""
+bonus_turn=false
+
+defending=false
+
+
+#AI Variables
+AI_hp=100
+AI_damage_buff=0
+AI_actions_left=0
+AI_defense=0
+
+
+load_npc() {
+	while [[ $valid_npc_choice != "valid" ]]; do
+	read -p "Who do you challenge?
+	1. Espada
+	2. John" npc_choice
+	
+	
+		case $npc_choice in
+			1)	
+				valid_npc_choice="valid"
+				source ~/lenain/npcs/espada.sh
+				;;
+
+			2) source ~/lenain/npcs/john.sh
+				valid_npc_choice="valid"
+				;;
+
+			*)	echo "Not available."
+				valid_npc_choice="invalid"
+				;;
+		esac
+		
+	done
+	echo "Challenging $NPC_NAME."
+}
+
+#Effect functions
+apply_effect() {
+
+	local target=$1
+	local effect=$2
+	local type=$3
+	local duration=$4
+	local value=$5
+	local state=$6
+	
+	local effects_array=()
+	
+	# Loop over each index in the player_effects array. If the new effect already exists in the array, reset its duration instead of adding a new one (hence the return)
+	#Otherwise, just ignore it and add as usual. 
+	if [[ $target == "player" ]]; then
+		for i in "${!player_effects[@]}"; do
+        	IFS=":" read -r name type turns value state <<< "${player_effects[i]}"
+
+        	if [[ $name == "$effect" ]]; then
+            	player_effects[i]="$name:$type:$duration:$value:$state"
+            	return
+        	fi
+    	done
+
+    player_effects+=("$effect:$type:$duration:$value:$state")
+
+	else
+		# Loop over each index in the AI_effects array. If the new effect already exists in the array, reset its duration instead of adding a new one (hence the return)
+	#Otherwise, just ignore it and add as usual. 
+		for i in "${!AI_effects[@]}"; do
+			IFS=":'" read -r name type turns value state <<< "${AI_effects[i]}"
+			
+			if [[ $name == "$effect" ]]; then
+            	AI_effects[i]="$name:$type:$duration:$value:$state"
+            	return
+        	fi
+    	done
+    AI_effects+=("$effect:$type:$duration:$value:$state")
+	fi
+}
+
+
+update_effects() {
+	local actor=$1
+	local new_effects=()
+
+	local effects_array=()
+
+	if [[ $actor == "player" ]]; then
+    	effects_array=("${player_effects[@]}")
+	else
+    	effects_array=("${AI_effects[@]}")
+	fi
+
+
+
+	for effect in "${effects_array[@]}"; do
+		IFS=":" read -r name type turns value state <<< "$effect"
+		
+		if [[ $state == "active" ]]; then
+		echo "DEBUG: -1 duration"
+		((turns--))
+		sleep 2
+		fi
+
+		if ((turns > 0)); then
+			new_effects+=("$name:$type:$turns:$value:$state")
+
+
+		else
+			echo "$name has worn off."
+		fi
+	done
+
+	if [[ $actor == "player" ]]; then
+		player_effects=("${new_effects[@]}")
+	
+	else
+		AI_effects=("${new_effects[@]}")
+	fi
+
+
+
+}
+
+has_effect() {
+	local active_effect=$1
+	local actor=$2
+	local effects_array=()
+
+	if [[ $actor == "player" ]]; then
+		effects_array=("${player_effects[@]}")
+	
+	else
+		effects_array=("${AI_effects[@]}")
+	fi
+
+	#For each effect the player has, take only the effect name and store it as a variable/
+	for effect in "${effects_array[@]}"; do
+		IFS=":" read -r effect_name type effect_turns value state <<< "$effect"
+		
+		[[ "$effect_name" == "$active_effect" ]] && return 0
+	done
+	
+	return 1
+}
+
+#A function used to dynamically calculate how much defense a target has so that we don't have to worry about adding and subtracting defense.
+dynamic_defense() {
+	local target=$1
+	local defense
+	local effects=()
+
+	if [[ $target == "player" ]]; then
+		defense=$player_defense
+		effects=("${player_effects[@]}")
+	else
+		defense=$AI_defense
+		effects=("${AI_effects[@]}")
+	fi
+	for effect in "${effects[@]}"; do
+		IFS=":" read -r effect_name type effect_turns value state <<< "$effect"
+		
+    
+
+    	sleep 3
+		if [[ $state == "active" && $type == "defensedown" ]]; then
+			defense=$((defense - value))
+		
+		elif [[ $state == "active" && $type == "defenseup" ]]; then
+			defense=$((defense + value))
+		
+		fi
+	done
+
+	echo "$defense"
+}
+
+
+calculate_damage() {
+	local base=$1
+	local active_dmg_buff=$2
+	local defender_defense=$3
+ 
+	local damage=$((base * (100 + active_dmg_buff) / 100))
+	damage=$((damage * (100 - defender_defense) / 100))
+
+	echo $damage #store end value
+}
+
+# This works for when there is a reactive enchantment
+on_player_hit() {
+	local damage_taken=$1
+	if has_effect "Thorns" player; then
+		local reflect=$((damage_taken * 25 / 100))
+		echo "Reflect $reflect damage with thorns."
+		
+		apply_effect "AI" "Bleed" "DOT_debuff" 2 10 "active"
+		AI_hp=$((AI_hp - reflect))
+	fi
+	
+}
+
+
+player_status(){
+	echo "Player HP: $player_hp | Player energy: $player_energy"
+	sleep 1
+	echo "Player defense: $player_defense | Current damage buff: $damage_buff %"
+
+	echo -e "Current status effects:"
+	
+	if ((${#player_effects[@]} == 0)); then
+		echo "None"
+	else
+		for effect in "${player_effects[@]}"; do
+			IFS=":" read -r effect_name type effect_turns value status <<< "$effect"
+
+
+			echo " - $effect_name ($effect_turns turns left)"
+		done
+	fi
+}
+
+AI_status(){
+	local current_defense=$(dynamic_defense "AI")
+	
+	echo "AI HP: $AI_hp | AI defense: $current_defense"
+	sleep 1
+	echo "Current damage buff: $AI_damage_buff %"
+	read -p "Enter to continue"
+
+	echo -e "Current status effects:"
+	if ((${#AI_effects[@]} == 0)); then
+		echo "None"
+	else
+		for effect in "${AI_effects[@]}"; do
+			IFS=":" read -r effect_name type effect_turns _ <<< "$effect"
+
+			echo " - $effect_name ($effect_turns turns left)"
+		done
+	fi
+	
+}
+
+start_of_turn() {
+	local actor=$1
+
+	local effects_array=()
+	local actor_hp
+
+	if [[ $actor == "player" ]]; then
+		effects_array=("${player_effects[@]}")
+	else
+    	effects_array=("${AI_effects[@]}")
+     	actor_hp=AI_hp
+	fi
+
+	 for i in "${!effects_array[@]}"; do
+        IFS=":" read -r effect_name type effect_turns value state <<< "${effects_array[i]}"
+
+
+        echo "DEBUG: effect='$effect_name' type='$type' turns='$effect_turns' value='$value' state='$state'" 
+  
+
+    	if [[ $state == "inactive" ]]; then
+    		player_effects[i]="$effect_name:$type:$effect_turns:$value:active"
+
+    		state="active"
+
+    	fi
+    	
+    	if [[ $state == "active" ]]; then
+    		case $type in
+
+    			DOT_debuff) 
+					echo "$actor takes $value damage from $effect_name!"
+	    			if [[ $actor == "player" ]]; then
+	    				player_hp=$((player_hp - value ))
+	    			else
+	    				AI_hp=$((AI_hp - value))
+	    			fi
+	    				sleep 2
+    			
+    			;;
+
+
+    		esac
+    	fi
+
+
+    done
+
+}
+
+end_turn() {
+	local actor=$1
+	
+	if [[ $actor == "player" ]]; then
+
+		update_effects player
+
+
+	else
+		update_effects AI
+	fi
+
+	
+}
+
+
+fight_menu(){
+read -p "which way of fighting do you choose?
+1. Sword
+2. Uppercut" fight_choice
+	case $fight_choice in
+	1)
+		local calculated_defense=$(dynamic_defense "AI")
+		local sword_damage=$(calculate_damage 20 $damage_buff $calculated_defense)
+		local critical=$((RANDOM % 100))
+		
+		read -p "Are you sure you want to use sword? A critical hit will x2 your damage and give
+		you a bonus turn." sword_choice
+			if [[ $sword_choice == "yes" ]]; then
+				echo "Swung sword"
+				sleep 1	
+				
+				if ((critical < 10)); then
+					echo "Critical hit! You get a bonus turn."
+					
+					sword_damage=$((sword_damage *= 2))
+					AI_hp=$((AI_hp - sword_damage))
+
+					echo "You deal $sword_damage damage!"
+					sleep 2
+
+					bonus_turn=true
+
+					
+					
+				
+				else
+					
+					AI_hp=$((AI_hp - sword_damage))
+					echo "You deal $sword_damage damage!"
+					
+					sleep 2
+
+				fi
+				return 0
+			else
+				return 1
+			fi
+		;;
+	2)
+		local calculated_defense=$(dynamic_defense "AI")
+		echo "Calculated defense: $calculated_defense"
+		local uppercut_damage=$(calculate_damage 15 $damage_buff "$calculated_defense")
+
+		
+		read -p "Are you sure you want to uppercut? This move reduces the defense of the target. 
+		This move cannot crit." uppercut_choice
+			if [[ $uppercut_choice == "yes" ]]; then
+				echo "Threw uppercut"
+				apply_effect "AI" "Vulnerable" "defensedown" 2 15 "active"
+				
+				AI_hp=$((AI_hp - uppercut_damage))
+				echo "You deal $uppercut_damage damage!"
+				sleep 2
+
+
+				return 0
+			else
+				return 1
+
+
+			fi
+			
+		;;
+
+	*)
+		echo "What are you talking about"
+		return 1
+	esac
+}
+
+defend_menu() {
+	read -p "Are you sure?" defend
+		if [[ $defend == "yes" ]]; then
+			echo "Doesn't work at the moment."
+			return 1
+			
+		fi
+}
+
+energy_menu(){
+	if has_effect "Crippled" player; then
+		echo "Cannot use abilities. Check your status for when the debuff expires."
+		sleep 3
+		return 1
+	else
+
+		read -p "There are a majority of things you can do with energy.
+		Choose between:
+		1. Thorns Enchant - Reflect 25% of the damage you take 
+		back to their attacker for 1 turn.
+
+		2. Battle Heal - Recover 50% of the damage you take as
+		health for 2 turns. 
+
+		3.Sharpness - Double sword damage for a turn. You take a bonus turn immediately after.
+		
+
+		Type back to return" nrg
+
+		case $nrg in
+		1)
+			read -p "Thorns costs 20 energy. Are you sure you want to enchant?
+			" thorns
+
+				if has_effect "Thorns" player; then
+					echo "Too many thorns don't you think?"
+					sleep 1
+					return 1
+				fi
+
+				if [[ $thorns == "yes" && $player_energy -ge 20 ]]; then
+					player_energy=$((player_energy-=20))
+					echo "Enchanted"
+					apply_effect "player" "Thorns" "misc" 2 10 inactive
+
+					return 0
+					
+					
+
+					
+				else
+					echo "Not enough energy or exited interface."
+					sleep 1
+					return 1
+					
+				fi
+				
+			;;
+		2)
+			read -p "Battle Heal costs 30 energy. Are you sure you want to enchant?
+			" bheal
+
+				if has_effect "Lifesteal" player; then
+					echo "too much vampire in your system"
+					sleep 1
+					return 1 
+				fi
+
+				if [[ $bheal == "yes" && $player_energy -ge 30  ]]; then
+					player_energy=$((player_energy - 30))
+					echo "Enchanted"
+					apply_effect player "Lifesteal" "healthbuff" 2 15 inactive
+
+					return 0
+				
+				else
+					echo "Not enough energy or exited interface."
+					sleep 1
+					return 1
+				fi
+							
+			;;
+		3)	read -p "Sharpness costs 40 energy. Are you sure you want to enchant?
+			" sharpness
+				if has_effect "Sharpness" player; then
+					echo "a little too sharp ay??"
+					sleep 1
+					return 1
+				fi
+
+				if [[ $sharpness == "yes" && $player_energy -ge 40 ]]; then
+					
+					player_energy=$((player_energy - 40))
+					damage_buff=$((damage_buff + 10))
+					
+					echo "Enchanted"
+					apply_effect player "Sharpness" "damagebuff" 1 10 "inactive"
+					
+					bonus_turn=true
+
+					sleep 2
+				
+				else
+					echo "Not enough energy or exited interface."
+					sleep 1
+					return 1
+						
+				fi
+				
+				
+				
+			;;
+
+		*)  echo "returning to main screen"
+			return 1
+				
+				;;
+
+		esac
+fi
+}
+
+
+player_menu() {
+	echo -e "$turns"
+	while (( player_hp > 0 )); do
+		read -p "Action to take 
+		1. Fight
+		2. Defend
+		3. Energy moves
+		4. Display current effects
+		" choice
+	#debug line
+		echo -e "$turns"
+		case $choice in
+			1)
+		  		if fight_menu; then
+		  		break
+		  	fi
+		  		;;
+			2)
+				if defend_menu; then
+				break
+			fi
+				;;
+			3)
+				if energy_menu; then
+				break
+			fi
+				;;
+		
+			4)	
+				player_status
+				;;
+			*)
+				echo -e "Do I need to translate to Bahasa Indonesia for you???"
+				;;
+			esac
+		done
+
+}
+
+take_turn() {
+    local actor=$1
+
+    
+
+    bonus_turn=false
+
+    start_of_turn "$actor"
+
+    if [[ $actor == "player" ]]; then
+        player_menu
+
+    else
+        AI_turn
+    fi
+
+    end_turn "$actor"
+
+    if [[ $bonus_turn == true ]]; then
+        echo "$actor gets a bonus turn!"
+        sleep 1
+        take_turn "$actor"
+    fi
+}
+
+AI_encounter(){
+	load_npc || return 1
+
+	while ((player_hp > 0 && AI_hp > 0)); do
+
+
+		take_turn "player"
+		
+		if (( AI_hp <= 0 )); then
+            echo "You defeated $NPC_NAME!"
+            return 0
+        fi
+
+		if ((AI_hp <= 0)); then
+			while [[ $retry != "y" || $retry != "n" ]]; do
+				read -p "You beat the training system. Retry? (y/n)" retry
+			
+			
+				if [[ $retry == "y" ]]; then
+						echo "cool"
+						sleep 1
+						clear
+						./TBAitest.sh
+
+
+				elif [[ $retry == "n" ]]; then
+						echo "begone"
+					
+
+				else
+						echo "figure it out"
+
+				fi
+			done
+		fi
+
+	
+		take_turn "AI"
+
+	
+	done
+}
+	
+echo "Today, you will fight an AI with a pre-determined loadout."
+sleep 2
+while [[ $selection != "true" ]]; do
+	read -p "You ready (yes/no)?" combat
+	if [[ $combat == "yes" || $combat == "y" ]]; then
+		echo "Let us begin."
+		sleep 2
+		AI_encounter
+		selection="true"
+
+	elif [[ $combat == "no" ||  $combat == "n" ]]; then
+		echo "get out"
+		sleep 2
+		selection="true"
+
+	else
+		echo "hm?"
+	fi
+done
+
+
+
